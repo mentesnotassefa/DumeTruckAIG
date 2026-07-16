@@ -6,7 +6,6 @@
     <title>Dump Truck Daily Activity Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -169,23 +168,6 @@
             color: #856404;
         }
 
-        .export-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: 0.3s;
-            margin-top: 10px;
-            float: right;
-        }
-        .export-btn:hover {
-            background: #218838;
-            transform: translateY(-2px);
-        }
-
         .loading {
             display: none;
             text-align: center;
@@ -289,7 +271,7 @@
         <div class="row" id="secondRow" style="display:none;">
             <div class="card full-width">
                 <h3>🚜 Excavator Trip Summary (Total Trips per Excavator with Dump Trucks)</h3>
-                <div class="table-wrapper" id="excavatorSummaryWrapper">
+                <div class="table-wrapper">
                     <table id="excavatorSummaryTable">
                         <thead>
                             <tr>
@@ -302,13 +284,6 @@
                     </table>
                 </div>
             </div>
-        </div>
-
-        <!-- Export Full Page Button -->
-        <div style="text-align: center; margin-top: 20px; display:none;" id="exportSection">
-            <button class="export-btn" onclick="exportFullPageToJPG()" style="font-size: 16px; padding: 12px 30px; float: none;">
-                📸 Export Full Dashboard to JPG
-            </button>
         </div>
     </div>
 
@@ -328,7 +303,6 @@
             document.getElementById('statsGrid').style.display = 'none';
             document.getElementById('contentRow').style.display = 'none';
             document.getElementById('secondRow').style.display = 'none';
-            document.getElementById('exportSection').style.display = 'none';
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -477,7 +451,6 @@
             document.getElementById('statsGrid').style.display = 'grid';
             document.getElementById('contentRow').style.display = 'grid';
             document.getElementById('secondRow').style.display = 'grid';
-            document.getElementById('exportSection').style.display = 'block';
         }
 
         function renderCollectorTable(data) {
@@ -561,64 +534,6 @@
                         }
                     }
                 }
-            });
-        }
-
-        function exportFullPageToJPG() {
-            const container = document.querySelector('.container');
-            const exportBtn = document.querySelector('#exportSection .export-btn');
-            
-            // Temporarily hide the export button for cleaner screenshot
-            exportBtn.style.display = 'none';
-            
-            // Add a temporary title for the export
-            const tempTitle = document.createElement('div');
-            tempTitle.style.cssText = `
-                text-align: center;
-                padding: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border-radius: 12px 12px 0 0;
-                margin-bottom: 20px;
-                display: none;
-            `;
-            tempTitle.innerHTML = `
-                <h2 style="font-size: 24px;">🚛 Dump Truck Daily Activity Report</h2>
-                <p style="opacity: 0.9;">Generated on ${new Date().toLocaleDateString()}</p>
-            `;
-            container.insertBefore(tempTitle, container.firstChild);
-            tempTitle.style.display = 'block';
-            
-            html2canvas(container, {
-                scale: 2,
-                backgroundColor: '#f0f2f5',
-                useCORS: true,
-                logging: false,
-                width: container.scrollWidth,
-                height: container.scrollHeight,
-                windowWidth: container.scrollWidth,
-                windowHeight: container.scrollHeight,
-                onclone: function(document) {
-                    // Ensure all elements are fully rendered
-                    document.querySelectorAll('.badge').forEach(el => {
-                        el.style.display = 'inline-block';
-                    });
-                }
-            }).then(canvas => {
-                // Restore the export button and remove temp title
-                exportBtn.style.display = 'inline-block';
-                tempTitle.remove();
-                
-                // Convert to JPG and download
-                const link = document.createElement('a');
-                link.download = `dump_truck_dashboard_${new Date().toISOString().slice(0,10)}.jpg`;
-                link.href = canvas.toDataURL('image/jpeg', 0.95);
-                link.click();
-            }).catch(error => {
-                console.error('Export failed:', error);
-                alert('Failed to export image. Please try again.');
-                exportBtn.style.display = 'inline-block';
-                tempTitle.remove();
             });
         }
 
