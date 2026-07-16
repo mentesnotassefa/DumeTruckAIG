@@ -182,6 +182,53 @@
             align-items: center;
             gap: 10px;
         }
+        .filter-section {
+            background: #f8f9ff;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            border: 1px solid #e0e0e0;
+        }
+        .filter-section label {
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        .filter-section select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #d0d0d0;
+            background: white;
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .filter-section select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.2);
+        }
+        .filter-section .clear-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .filter-section .clear-btn:hover {
+            background: #c82333;
+            transform: scale(1.02);
+        }
+
         .table-wrapper {
             overflow-x: auto;
             max-height: 400px;
@@ -213,6 +260,9 @@
         }
         tr:hover {
             background: #e8ecff;
+        }
+        .hidden-row {
+            display: none;
         }
 
         .badge {
@@ -248,27 +298,6 @@
             background: linear-gradient(135deg, #ffd700, #ffb300);
             color: #333;
             border: 1px solid #ffaa00;
-            font-weight: 700;
-            padding: 4px 8px;
-        }
-        .badge-rank-1 {
-            background: linear-gradient(135deg, #ffd700, #ffb300);
-            color: #333;
-            border: 2px solid #ffaa00;
-            font-weight: 700;
-            padding: 4px 8px;
-        }
-        .badge-rank-2 {
-            background: linear-gradient(135deg, #c0c0c0, #a8a8a8);
-            color: #333;
-            border: 2px solid #999;
-            font-weight: 700;
-            padding: 4px 8px;
-        }
-        .badge-rank-3 {
-            background: linear-gradient(135deg, #cd7f32, #b87333);
-            color: white;
-            border: 2px solid #a6662a;
             font-weight: 700;
             padding: 4px 8px;
         }
@@ -336,6 +365,13 @@
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-section select {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -399,6 +435,17 @@
             </div>
             <div class="card">
                 <h3>📋 Data Collector Details with Rankings</h3>
+                <div class="filter-section">
+                    <label>🔍 Filter by Data Collector:</label>
+                    <select id="collectorFilter" onchange="applyFilters()">
+                        <option value="all">All Collectors</option>
+                    </select>
+                    <label>🔍 Filter by Excavator:</label>
+                    <select id="excavatorFilterCollector" onchange="applyFilters()">
+                        <option value="all">All Excavators</option>
+                    </select>
+                    <button class="clear-btn" onclick="clearFilters('collector')">Clear Filters</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="collectorTable">
                         <thead>
@@ -419,6 +466,17 @@
         <div class="row" id="secondRow" style="display:none;">
             <div class="card full-width">
                 <h3>🚜 Excavator Performance Rankings (Top 5 by Trips)</h3>
+                <div class="filter-section">
+                    <label>🔍 Filter by Excavator:</label>
+                    <select id="excavatorFilter" onchange="applyFilters()">
+                        <option value="all">All Excavators</option>
+                    </select>
+                    <label>🔍 Filter by Dump Truck:</label>
+                    <select id="dtFilterExcavator" onchange="applyFilters()">
+                        <option value="all">All Dump Trucks</option>
+                    </select>
+                    <button class="clear-btn" onclick="clearFilters('excavator')">Clear Filters</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="excavatorSummaryTable">
                         <thead>
@@ -434,11 +492,44 @@
                 </div>
             </div>
         </div>
+
+        <div class="row" id="thirdRow" style="display:none;">
+            <div class="card full-width">
+                <h3>🚛 Dump Truck Trip Summary (Top 5 by Trips)</h3>
+                <div class="filter-section">
+                    <label>🔍 Filter by Dump Truck:</label>
+                    <select id="dtFilter" onchange="applyFilters()">
+                        <option value="all">All Dump Trucks</option>
+                    </select>
+                    <label>🔍 Filter by Data Collector:</label>
+                    <select id="collectorFilterDT" onchange="applyFilters()">
+                        <option value="all">All Collectors</option>
+                    </select>
+                    <button class="clear-btn" onclick="clearFilters('dt')">Clear Filters</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="dtSummaryTable">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Dump Truck</th>
+                                <th>Total Trips</th>
+                                <th>Data Collectors</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let chartInstance1 = null;
         let rawData = null;
+        let collectorData = [];
+        let excavatorData = [];
+        let dtData = [];
 
         // Color palette for chart
         const chartColors = [
@@ -479,6 +570,7 @@
             document.getElementById('statsGrid').style.display = 'none';
             document.getElementById('contentRow').style.display = 'none';
             document.getElementById('secondRow').style.display = 'none';
+            document.getElementById('thirdRow').style.display = 'none';
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -511,6 +603,7 @@
             let totalTrips = 0;
             const collectorMap = new Map(); // collector -> {trips, excavators: Set, dumpTrucks: Set}
             const excavatorMap = new Map(); // excavator -> {trips, dumpTrucks: Set}
+            const dtMap = new Map(); // dump truck -> {trips, collectors: Set}
 
             // Process each row
             data.forEach(row => {
@@ -585,6 +678,21 @@
                         }
                     }
                 }
+
+                // Process dump truck data
+                if (dumpTruck) {
+                    if (!dtMap.has(dumpTruck)) {
+                        dtMap.set(dumpTruck, {
+                            trips: 0,
+                            collectors: new Set()
+                        });
+                    }
+                    const dtData = dtMap.get(dumpTruck);
+                    dtData.trips += trips;
+                    if (collector) {
+                        dtData.collectors.add(collector);
+                    }
+                }
             });
 
             // Display stats
@@ -595,7 +703,7 @@
             document.getElementById('totalTrips').textContent = totalTrips;
 
             // Prepare collector data for display
-            const collectorData = [];
+            collectorData = [];
             collectorMap.forEach((value, key) => {
                 collectorData.push({
                     name: key,
@@ -607,7 +715,7 @@
             collectorData.sort((a, b) => b.trips - a.trips);
 
             // Prepare excavator summary data
-            const excavatorData = [];
+            excavatorData = [];
             excavatorMap.forEach((value, key) => {
                 excavatorData.push({
                     plate: key,
@@ -617,9 +725,24 @@
             });
             excavatorData.sort((a, b) => b.trips - a.trips);
 
+            // Prepare dump truck summary data
+            dtData = [];
+            dtMap.forEach((value, key) => {
+                dtData.push({
+                    name: key,
+                    trips: value.trips,
+                    collectors: Array.from(value.collectors)
+                });
+            });
+            dtData.sort((a, b) => b.trips - a.trips);
+
+            // Populate filter dropdowns
+            populateFilters(collectorData, excavatorData, dtData);
+
             // Render tables and charts
             renderCollectorTable(collectorData);
             renderExcavatorSummaryTable(excavatorData);
+            renderDTSummaryTable(dtData);
             renderCollectorChart(collectorData);
 
             // Show results
@@ -627,6 +750,112 @@
             document.getElementById('statsGrid').style.display = 'grid';
             document.getElementById('contentRow').style.display = 'grid';
             document.getElementById('secondRow').style.display = 'grid';
+            document.getElementById('thirdRow').style.display = 'grid';
+        }
+
+        function populateFilters(collectors, excavators, dumpTrucks) {
+            // Collector filter for collector table
+            const collectorFilter = document.getElementById('collectorFilter');
+            collectorFilter.innerHTML = '<option value="all">All Collectors</option>';
+            collectors.forEach(c => {
+                collectorFilter.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+            });
+
+            // Excavator filter for collector table
+            const excFilterCollector = document.getElementById('excavatorFilterCollector');
+            excFilterCollector.innerHTML = '<option value="all">All Excavators</option>';
+            const allExcavators = new Set();
+            collectors.forEach(c => c.excavators.forEach(e => allExcavators.add(e)));
+            allExcavators.forEach(e => {
+                excFilterCollector.innerHTML += `<option value="${e}">${e}</option>`;
+            });
+
+            // Excavator filter for excavator table
+            const excFilter = document.getElementById('excavatorFilter');
+            excFilter.innerHTML = '<option value="all">All Excavators</option>';
+            excavators.forEach(e => {
+                excFilter.innerHTML += `<option value="${e.plate}">${e.plate}</option>`;
+            });
+
+            // Dump truck filter for excavator table
+            const dtFilterExcavator = document.getElementById('dtFilterExcavator');
+            dtFilterExcavator.innerHTML = '<option value="all">All Dump Trucks</option>';
+            const allDT = new Set();
+            excavators.forEach(e => e.dumpTrucks.forEach(dt => allDT.add(dt)));
+            allDT.forEach(dt => {
+                dtFilterExcavator.innerHTML += `<option value="${dt}">${dt}</option>`;
+            });
+
+            // Dump truck filter for DT table
+            const dtFilter = document.getElementById('dtFilter');
+            dtFilter.innerHTML = '<option value="all">All Dump Trucks</option>';
+            dumpTrucks.forEach(dt => {
+                dtFilter.innerHTML += `<option value="${dt.name}">${dt.name}</option>`;
+            });
+
+            // Collector filter for DT table
+            const collectorFilterDT = document.getElementById('collectorFilterDT');
+            collectorFilterDT.innerHTML = '<option value="all">All Collectors</option>';
+            collectors.forEach(c => {
+                collectorFilterDT.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+            });
+        }
+
+        function applyFilters() {
+            // Filter collector table
+            const collectorFilter = document.getElementById('collectorFilter').value;
+            const excavatorFilter = document.getElementById('excavatorFilterCollector').value;
+            
+            let filteredCollectors = collectorData;
+            if (collectorFilter !== 'all') {
+                filteredCollectors = filteredCollectors.filter(c => c.name === collectorFilter);
+            }
+            if (excavatorFilter !== 'all') {
+                filteredCollectors = filteredCollectors.filter(c => c.excavators.includes(excavatorFilter));
+            }
+            renderCollectorTable(filteredCollectors);
+
+            // Filter excavator table
+            const excFilter = document.getElementById('excavatorFilter').value;
+            const dtFilterExc = document.getElementById('dtFilterExcavator').value;
+            
+            let filteredExcavators = excavatorData;
+            if (excFilter !== 'all') {
+                filteredExcavators = filteredExcavators.filter(e => e.plate === excFilter);
+            }
+            if (dtFilterExc !== 'all') {
+                filteredExcavators = filteredExcavators.filter(e => e.dumpTrucks.includes(dtFilterExc));
+            }
+            renderExcavatorSummaryTable(filteredExcavators);
+
+            // Filter DT table
+            const dtFilter = document.getElementById('dtFilter').value;
+            const collectorFilterDT = document.getElementById('collectorFilterDT').value;
+            
+            let filteredDT = dtData;
+            if (dtFilter !== 'all') {
+                filteredDT = filteredDT.filter(dt => dt.name === dtFilter);
+            }
+            if (collectorFilterDT !== 'all') {
+                filteredDT = filteredDT.filter(dt => dt.collectors.includes(collectorFilterDT));
+            }
+            renderDTSummaryTable(filteredDT);
+        }
+
+        function clearFilters(type) {
+            if (type === 'collector') {
+                document.getElementById('collectorFilter').value = 'all';
+                document.getElementById('excavatorFilterCollector').value = 'all';
+                renderCollectorTable(collectorData);
+            } else if (type === 'excavator') {
+                document.getElementById('excavatorFilter').value = 'all';
+                document.getElementById('dtFilterExcavator').value = 'all';
+                renderExcavatorSummaryTable(excavatorData);
+            } else if (type === 'dt') {
+                document.getElementById('dtFilter').value = 'all';
+                document.getElementById('collectorFilterDT').value = 'all';
+                renderDTSummaryTable(dtData);
+            }
         }
 
         function renderCollectorTable(data) {
@@ -636,7 +865,6 @@
             data.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 
-                // Rank display (top 3 get special badges)
                 let rankDisplay = '';
                 if (index === 0) {
                     rankDisplay = `<span class="rank-number rank-1">🥇</span>`;
@@ -671,7 +899,7 @@
             const tbody = document.querySelector('#excavatorSummaryTable tbody');
             tbody.innerHTML = '';
             
-            // Show top 5 excavators
+            // Show top 5 excavators with ranks
             const top5 = data.slice(0, 5);
             
             top5.forEach((item, index) => {
@@ -715,6 +943,60 @@
                         <td><strong style="color:#667eea;">${item.plate}</strong></td>
                         <td><span class="badge badge-trip">${item.trips}</span></td>
                         <td>${dtBadges || '<span class="badge">None</span>'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function renderDTSummaryTable(data) {
+            const tbody = document.querySelector('#dtSummaryTable tbody');
+            tbody.innerHTML = '';
+            
+            // Show top 5 dump trucks with ranks
+            const top5 = data.slice(0, 5);
+            
+            top5.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                
+                let rankDisplay = '';
+                if (index === 0) {
+                    rankDisplay = `<span class="rank-number rank-1">#1</span>`;
+                } else if (index === 1) {
+                    rankDisplay = `<span class="rank-number rank-2">#2</span>`;
+                } else if (index === 2) {
+                    rankDisplay = `<span class="rank-number rank-3">#3</span>`;
+                } else {
+                    rankDisplay = `<span class="rank-number" style="background:#e0e0e0;color:#666;">#${index + 1}</span>`;
+                }
+                
+                const collectorBadges = item.collectors.map(c => 
+                    `<span class="badge" style="background:#d1ecf1;color:#0c5460;">${c}</span>`
+                ).join(' ');
+                
+                tr.innerHTML = `
+                    <td>${rankDisplay}</td>
+                    <td><strong style="color:#667eea;">${item.name}</strong></td>
+                    <td><span class="badge badge-trip" style="font-size:14px;padding:6px 15px;">${item.trips}</span></td>
+                    <td>${collectorBadges || '<span class="badge">None</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            // If there are more than 5 dump trucks, show remaining ones without rank
+            if (data.length > 5) {
+                const remaining = data.slice(5);
+                remaining.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const collectorBadges = item.collectors.map(c => 
+                        `<span class="badge" style="background:#d1ecf1;color:#0c5460;">${c}</span>`
+                    ).join(' ');
+                    
+                    tr.innerHTML = `
+                        <td><span class="rank-number" style="background:#e0e0e0;color:#666;">•</span></td>
+                        <td><strong style="color:#667eea;">${item.name}</strong></td>
+                        <td><span class="badge badge-trip">${item.trips}</span></td>
+                        <td>${collectorBadges || '<span class="badge">None</span>'}</td>
                     `;
                     tbody.appendChild(tr);
                 });
