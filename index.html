@@ -198,7 +198,7 @@
             color: #555;
             font-size: 14px;
         }
-        .filter-section select {
+        .filter-section select, .filter-section input {
             padding: 6px 12px;
             border-radius: 8px;
             border: 1px solid #d0d0d0;
@@ -208,7 +208,7 @@
             cursor: pointer;
             transition: border-color 0.3s;
         }
-        .filter-section select:focus {
+        .filter-section select:focus, .filter-section input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102,126,234,0.2);
@@ -227,6 +227,30 @@
         .filter-section .clear-btn:hover {
             background: #c82333;
             transform: scale(1.02);
+        }
+        .filter-section .apply-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .filter-section .apply-btn:hover {
+            background: #218838;
+            transform: scale(1.02);
+        }
+        .date-filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .date-filter-group input[type="date"] {
+            min-width: 140px;
         }
 
         .table-wrapper {
@@ -347,6 +371,18 @@
         .full-width {
             grid-column: 1 / -1;
         }
+        .date-summary {
+            background: #f8f9ff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #555;
+            border: 1px solid #e0e0e0;
+        }
+        .date-summary strong {
+            color: #333;
+        }
 
         @media (max-width: 768px) {
             .row {
@@ -369,8 +405,12 @@
                 flex-direction: column;
                 align-items: stretch;
             }
-            .filter-section select {
+            .filter-section select, .filter-section input {
                 width: 100%;
+            }
+            .date-filter-group {
+                flex-direction: column;
+                align-items: stretch;
             }
         }
     </style>
@@ -422,6 +462,21 @@
                 <div class="icon">🔄</div>
                 <div class="number" id="totalTrips">0</div>
                 <div class="label">Total Trips</div>
+            </div>
+        </div>
+
+        <!-- Global Date Filter -->
+        <div class="filter-section" id="globalDateFilter" style="display:none;">
+            <label>📅 Filter by Date Range:</label>
+            <div class="date-filter-group">
+                <input type="date" id="dateFrom" onchange="applyDateFilter()">
+                <span>to</span>
+                <input type="date" id="dateTo" onchange="applyDateFilter()">
+                <button class="apply-btn" onclick="applyDateFilter()">Apply Date Filter</button>
+                <button class="clear-btn" onclick="clearDateFilter()">Clear Date Filter</button>
+            </div>
+            <div class="date-summary" id="dateSummary">
+                Showing data from <strong>all dates</strong>
             </div>
         </div>
 
@@ -527,9 +582,11 @@
     <script>
         let chartInstance1 = null;
         let rawData = null;
+        let filteredData = null;
         let collectorData = [];
         let excavatorData = [];
         let dtData = [];
+        let allDates = [];
 
         // Color palette for chart
         const chartColors = [
@@ -571,6 +628,7 @@
             document.getElementById('contentRow').style.display = 'none';
             document.getElementById('secondRow').style.display = 'none';
             document.getElementById('thirdRow').style.display = 'none';
+            document.getElementById('globalDateFilter').style.display = 'none';
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -586,13 +644,178 @@
                         return;
                     }
 
-                    analyzeData(rawData);
+                    // Extract all unique dates from the data
+                    extractDates(rawData);
+                    
+                    // Set filtered data to all data initially
+                    filteredData = rawData;
+                    
+                    analyzeData(filteredData);
                 } catch (error) {
                     alert('Error processing file: ' + error.message);
                     document.getElementById('loading').classList.remove('active');
                 }
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        function extractDates(data) {
+            allDates = [];
+            data.forEach(row => {
+                const dateStr = row['Date'];
+                if (dateStr !== undefined && dateStr !== null && dateStr !== '') {
+                    // Handle different date formats from Excel
+                    let dateObj = null;
+                    
+                    // Case 1: Date is already a Date object
+                    if (dateStr instanceof Date) {
+                        dateObj = dateStr;
+                    }
+                    // Case 2: Date is a number (Excel serial date)
+                    else if (typeof dateStr === 'number' && dateStr > 0) {
+                        // Excel serial date conversion
+                        const excelEpoch = new Date(1899, 11, 30);
+                        dateObj = new Date(excelEpoch.getTime() + dateStr * 86400000);
+                    }
+                    // Case 3: Date is a string
+                    else if (typeof dateStr === 'string') {
+                        // Try parsing as YYYY-MM-DD first
+                        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                            const parts = dateStr.split('-');
+                            dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        } 
+                        // Try parsing as MM/DD/YYYY
+                        else if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                            const parts = dateStr.split('/');
+                            dateObj = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                        }
+                        // Try standard Date parsing
+                        else {
+                            const d = new Date(dateStr);
+                            if (!isNaN(d.getTime())) {
+                                dateObj = d;
+                            }
+                        }
+                    }
+                    
+                    if (dateObj && !isNaN(dateObj.getTime())) {
+                        const year = dateObj.getFullYear();
+                        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        const day = String(dateObj.getDate()).padStart(2, '0');
+                        const dateKey = `${year}-${month}-${day}`;
+                        
+                        if (!allDates.includes(dateKey)) {
+                            allDates.push(dateKey);
+                        }
+                    }
+                }
+            });
+            
+            allDates.sort();
+            console.log('Extracted dates:', allDates); // Debug log
+            
+            // Set min and max dates on date pickers
+            if (allDates.length > 0) {
+                document.getElementById('dateFrom').min = allDates[0];
+                document.getElementById('dateTo').max = allDates[allDates.length - 1];
+                // Set default values to show all data
+                document.getElementById('dateFrom').value = '';
+                document.getElementById('dateTo').value = '';
+            }
+            
+            document.getElementById('globalDateFilter').style.display = 'flex';
+            updateDateSummary('all');
+        }
+
+        function applyDateFilter() {
+            const fromDate = document.getElementById('dateFrom').value;
+            const toDate = document.getElementById('dateTo').value;
+            
+            if (!fromDate && !toDate) {
+                // No date filter applied, show all data
+                filteredData = rawData;
+                updateDateSummary('all');
+            } else {
+                // Filter data by date range
+                filteredData = rawData.filter(row => {
+                    const dateStr = row['Date'];
+                    if (dateStr === undefined || dateStr === null || dateStr === '') {
+                        return true; // Include rows without dates
+                    }
+                    
+                    // Convert row date to YYYY-MM-DD format
+                    let rowDateStr = null;
+                    
+                    if (dateStr instanceof Date) {
+                        const year = dateStr.getFullYear();
+                        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+                        const day = String(dateStr.getDate()).padStart(2, '0');
+                        rowDateStr = `${year}-${month}-${day}`;
+                    }
+                    else if (typeof dateStr === 'number' && dateStr > 0) {
+                        const excelEpoch = new Date(1899, 11, 30);
+                        const dateObj = new Date(excelEpoch.getTime() + dateStr * 86400000);
+                        const year = dateObj.getFullYear();
+                        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        const day = String(dateObj.getDate()).padStart(2, '0');
+                        rowDateStr = `${year}-${month}-${day}`;
+                    }
+                    else if (typeof dateStr === 'string') {
+                        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                            rowDateStr = dateStr;
+                        } else if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                            const parts = dateStr.split('/');
+                            const year = parts[2];
+                            const month = String(parts[0]).padStart(2, '0');
+                            const day = String(parts[1]).padStart(2, '0');
+                            rowDateStr = `${year}-${month}-${day}`;
+                        } else {
+                            const d = new Date(dateStr);
+                            if (!isNaN(d.getTime())) {
+                                const year = d.getFullYear();
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                rowDateStr = `${year}-${month}-${day}`;
+                            }
+                        }
+                    }
+                    
+                    if (!rowDateStr) return true; // If we can't parse the date, include it
+                    
+                    if (fromDate && toDate) {
+                        return rowDateStr >= fromDate && rowDateStr <= toDate;
+                    } else if (fromDate) {
+                        return rowDateStr >= fromDate;
+                    } else if (toDate) {
+                        return rowDateStr <= toDate;
+                    }
+                    return true;
+                });
+                
+                updateDateSummary('range');
+            }
+            
+            // Re-analyze with filtered data
+            analyzeData(filteredData);
+        }
+
+        function clearDateFilter() {
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            filteredData = rawData;
+            updateDateSummary('all');
+            analyzeData(filteredData);
+        }
+
+        function updateDateSummary(type) {
+            const summary = document.getElementById('dateSummary');
+            if (type === 'all') {
+                summary.innerHTML = `Showing data from <strong>all dates</strong> (${allDates.length} unique dates)`;
+            } else if (type === 'range') {
+                const from = document.getElementById('dateFrom').value || 'start';
+                const to = document.getElementById('dateTo').value || 'end';
+                summary.innerHTML = `Showing data from <strong>${from}</strong> to <strong>${to}</strong>`;
+            }
         }
 
         function analyzeData(data) {
@@ -714,8 +937,7 @@
             });
             collectorData.sort((a, b) => b.trips - a.trips);
 
-            // Prepare excavator summary data
-            excavatorData = [];
+            // Prepare excavator summary data            excavatorData = [];
             excavatorMap.forEach((value, key) => {
                 excavatorData.push({
                     plate: key,
