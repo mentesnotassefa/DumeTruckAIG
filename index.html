@@ -6,6 +6,7 @@
     <title>Dump Truck Daily Activity Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -181,6 +182,40 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .card-header-row h3 {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .export-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            white-space: nowrap;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        .export-btn:hover {
+            background: #5468d4;
+            transform: scale(1.03);
+        }
+        .export-btn:active {
+            transform: scale(0.97);
         }
         .filter-section {
             background: #f8f9ff;
@@ -428,14 +463,20 @@
 
         <!-- Charts & Tables -->
         <div class="row" id="contentRow" style="display:none;">
-            <div class="card">
-                <h3>🏆 Top Data Collectors by Trips</h3>
-                <div style="height:300px;">
+            <div class="card" id="collectorChartCard">
+                <div class="card-header-row">
+                    <h3>🏆 Data Collectors by Trips</h3>
+                    <button class="export-btn" onclick="exportSectionAsJPG('collectorChartCard','data-collectors-chart')">⬇️ Export JPG</button>
+                </div>
+                <div id="collectorChartWrap" style="height:300px;">
                     <canvas id="collectorChart"></canvas>
                 </div>
             </div>
-            <div class="card">
-                <h3>📋 Data Collector Details with Rankings</h3>
+            <div class="card" id="collectorTableCard">
+                <div class="card-header-row">
+                    <h3>📋 Data Collector Details with Rankings</h3>
+                    <button class="export-btn" onclick="exportSectionAsJPG('collectorTableCard','data-collector-details')">⬇️ Export JPG</button>
+                </div>
                 <div class="filter-section">
                     <label>🔍 Filter by Data Collector:</label>
                     <select id="collectorFilter" onchange="applyFilters()">
@@ -465,8 +506,11 @@
         </div>
 
         <div class="row" id="secondRow" style="display:none;">
-            <div class="card full-width">
-                <h3>🚜 Excavator Performance Rankings (Top 5 by Trips)</h3>
+            <div class="card full-width" id="excavatorCard">
+                <div class="card-header-row">
+                    <h3>🚜 Excavator Performance Rankings (Top 5 by Trips)</h3>
+                    <button class="export-btn" onclick="exportSectionAsJPG('excavatorCard','excavator-performance')">⬇️ Export JPG</button>
+                </div>
                 <div class="filter-section">
                     <label>🔍 Filter by Excavator:</label>
                     <select id="excavatorFilter" onchange="applyFilters()">
@@ -495,8 +539,11 @@
         </div>
 
         <div class="row" id="thirdRow" style="display:none;">
-            <div class="card full-width">
-                <h3>🚛 Dump Truck Trip Summary (Top 5 by Trips)</h3>
+            <div class="card full-width" id="dtCard">
+                <div class="card-header-row">
+                    <h3>🚛 Dump Truck Trip Summary (Top 5 by Trips)</h3>
+                    <button class="export-btn" onclick="exportSectionAsJPG('dtCard','dump-truck-summary')">⬇️ Export JPG</button>
+                </div>
                 <div class="filter-section">
                     <label>🔍 Filter by Dump Truck:</label>
                     <select id="dtFilter" onchange="applyFilters()">
@@ -1059,18 +1106,27 @@
                 chartInstance1.destroy();
             }
 
-            // Take top 10 for display
-            const topData = data.slice(0, 10);
-            const colors = topData.map((_, i) => chartColors[i % chartColors.length]);
-            const borders = topData.map((_, i) => borderColors[i % borderColors.length]);
+            // Show every data collector (not just a top-N slice).
+            const allData = data;
+            const colors = allData.map((_, i) => chartColors[i % chartColors.length]);
+            const borders = allData.map((_, i) => borderColors[i % borderColors.length]);
+
+            // Horizontal bars scale much better than vertical ones once there
+            // are more than a handful of collectors, so grow the wrapper's
+            // height with the number of collectors instead of cramming them
+            // into a fixed 300px box.
+            const wrap = document.getElementById('collectorChartWrap');
+            if (wrap) {
+                wrap.style.height = Math.max(300, allData.length * 32) + 'px';
+            }
             
             chartInstance1 = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: topData.map(d => d.name),
+                    labels: allData.map(d => d.name),
                     datasets: [{
                         label: 'Trips',
-                        data: topData.map(d => d.trips),
+                        data: allData.map(d => d.trips),
                         backgroundColor: colors,
                         borderColor: borders,
                         borderWidth: 2,
@@ -1079,6 +1135,7 @@
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
@@ -1086,13 +1143,13 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `Trips: ${context.parsed.y}`;
+                                    return `Trips: ${context.parsed.x}`;
                                 }
                             }
                         }
                     },
                     scales: {
-                        y: {
+                        x: {
                             beginAtZero: true,
                             title: { 
                                 display: true, 
@@ -1103,11 +1160,10 @@
                                 color: 'rgba(0,0,0,0.05)'
                             }
                         },
-                        x: {
+                        y: {
                             ticks: { 
-                                maxRotation: 30, 
-                                minRotation: 15,
-                                font: { size: 11 }
+                                font: { size: 12, weight: 'bold' },
+                                color: '#333'
                             },
                             grid: {
                                 display: false
@@ -1128,14 +1184,67 @@
                             meta.data.forEach(function(bar, index) {
                                 const data = dataset.data[index];
                                 ctx.fillStyle = '#333';
-                                ctx.font = 'bold 13px Arial';
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'bottom';
-                                ctx.fillText(data, bar.x, bar.y - 5);
+                                ctx.font = 'bold 12px Arial';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(data, bar.x + 6, bar.y);
                             });
                         });
                     }
                 }]
+            });
+        }
+
+        function exportSectionAsJPG(elementId, filename) {
+            const el = document.getElementById(elementId);
+            if (!el || typeof html2canvas === 'undefined') {
+                alert('Export is not available right now. Please try again in a moment.');
+                return;
+            }
+            const exportBtn = el.querySelector('.export-btn');
+            const originalText = exportBtn ? exportBtn.textContent : null;
+            if (exportBtn) exportBtn.textContent = '⏳ Exporting...';
+
+            // Table sections scroll internally (max-height + overflow-y) so
+            // only a few rows are visible on screen at once. Temporarily
+            // remove that clipping so the exported image contains every row,
+            // then restore the original styles afterwards.
+            const wrappers = el.querySelectorAll('.table-wrapper');
+            const savedStyles = [];
+            wrappers.forEach(function(w) {
+                savedStyles.push({
+                    el: w,
+                    maxHeight: w.style.maxHeight,
+                    overflowY: w.style.overflowY
+                });
+                w.style.maxHeight = 'none';
+                w.style.overflowY = 'visible';
+            });
+
+            function restore() {
+                savedStyles.forEach(function(s) {
+                    s.el.style.maxHeight = s.maxHeight;
+                    s.el.style.overflowY = s.overflowY;
+                });
+                if (exportBtn) exportBtn.textContent = originalText;
+            }
+
+            html2canvas(el, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+                windowWidth: el.scrollWidth,
+                windowHeight: el.scrollHeight
+            }).then(function(canvas) {
+                const link = document.createElement('a');
+                link.download = filename + '.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+                restore();
+            }).catch(function(err) {
+                console.error('Export failed:', err);
+                alert('Export failed: ' + err.message);
+                restore();
             });
         }
 
